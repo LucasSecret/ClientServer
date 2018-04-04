@@ -1,0 +1,1 @@
+/usr/bin/c++.exe -g  -Wl,--enable-auto-import CMakeFiles/Battleships_client.dir/main.cpp.o  -o Battleships_client.exe -Wl,--out-implib,libBattleships_client.dll.a -Wl,--major-image-version,0,--minor-image-version,0 

@@ -1,0 +1,4 @@
+ToolSet: 2.10.0@C:\Data\Development\cygwin
+Options: msvc.arch=amd64, version=8.1
+
+Options:

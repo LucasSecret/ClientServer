@@ -1,0 +1,26 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/cygdrive/d/Repositories/ClientServeur/Battleships/common/enums.h
+
+/cygdrive/d/Repositories/ClientServeur/Battleships/main.cpp
+thread
+-
+unistd.h
+-
+sys/socket.h
+-
+netinet/in.h
+-
+cstring
+-
+iostream
+-
+common/enums.h
+/cygdrive/d/Repositories/ClientServeur/Battleships/common/enums.h
+

@@ -1,0 +1,1 @@
+/usr/bin/c++.exe  -std=c++11 -pthread -g  -Wl,--enable-auto-import CMakeFiles/Battleships.dir/main.cpp.o  -o Battleships.exe -Wl,--out-implib,libBattleships.dll.a -Wl,--major-image-version,0,--minor-image-version,0 

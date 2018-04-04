@@ -1,0 +1,4 @@
+C:\Users\balth\.CLion2017.3\system\cygwin_cmake\bin\cmake.exe -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /cygdrive/d/Repositories/ClientServeur/Battleships_client
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /cygdrive/d/Repositories/ClientServeur/Battleships_client/cmake-build-debug

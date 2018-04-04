@@ -1,0 +1,3 @@
+/cygdrive/d/Repositories/ClientServeur/Battleships_client/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/cygdrive/d/Repositories/ClientServeur/Battleships_client/cmake-build-debug/CMakeFiles/edit_cache.dir
+/cygdrive/d/Repositories/ClientServeur/Battleships_client/cmake-build-debug/CMakeFiles/Battleships_client.dir
