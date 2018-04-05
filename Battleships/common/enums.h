@@ -72,6 +72,12 @@ enum BoardElements
 
 
 //Notre enum:
+#define CREATE_GAME 1
+#define CONNECT 2
+#define CREATE_BOAT 3
+#define ATTACK 4
+#define QUIT 5
+
 #define GAME_OK 10
 #define ID_TAKEN 11
 #define SIZE_TOO_SMALL 12

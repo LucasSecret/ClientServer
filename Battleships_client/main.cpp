@@ -8,7 +8,7 @@
 
 #include "common/enums.h"
 
-#define MYPORT 44578
+#define MYPORT 32000
 #define MAXDATASIZE 200
 
 int boardSize;
