@@ -68,5 +68,31 @@ enum BoardElements
     HITTED,
     SINKED
 };
-
 #endif
+
+
+//Notre enum:
+#define GAME_OK 10
+#define ID_TAKEN 11
+#define SIZE_TOO_SMALL 12
+#define UKNOWN_IP 13
+
+#define CONNEXION_OK 20
+#define CLIENT_JOINED 21
+#define UKNOWN_GAME_ID 22
+
+#define BOAT_OK 30
+#define NEGATIVE_SIZE 30
+#define BOAT_OUT_OF_BOUNDS 32
+#define NON_STRAIGHT_BOAT 33
+#define NOT_SPACE_ENOUGH 34
+
+#define TOUCHED_BOAT 40
+#define SINKED_BOAT 41
+#define NOTHING_AFFECTED 42
+#define GAME_WINNED 43
+#define GAME_LOOSED 44
+#define UKNOWN_TARGET 45
+#define STRIKE_OUT_OF_BANDS 46
+
+#define CLIENT_QUITED 50

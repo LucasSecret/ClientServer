@@ -55,7 +55,7 @@ int main()
 
     if((bind(sockfd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr))) == -1)
     {
-        perror("Creation point connexion");
+        perror("Creation point connexion : ");
         exit(EXIT_FAILURE);
     }
     //endregion
