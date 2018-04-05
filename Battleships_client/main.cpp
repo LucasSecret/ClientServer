@@ -158,12 +158,12 @@ void joinGame(int socket)
             continue;
 
         switch (id) {
-            case ASK_INIT_GAME:
+            case DEMANDE_CREER:
                 initGame(socket);
                 std::cout << "En attente du deuxième joueur..." << std::endl;
                 break;
 
-            case JOIN_SUCCESS:
+            case PARTIE_REJOINTE:
                 temp = string.substr(nextDelimiter, string.find("||", nextDelimiter) - nextDelimiter);
                 std::cout << "La partie va bientot commencé ! La taille du plateau est de "
                           << temp << " par " << temp << std::endl << std::endl;
@@ -207,13 +207,13 @@ void initGame(int socket)
             continue;
 
         switch (id) {
-            case BOARD_TOO_SMALL:
-            case BOARD_TOO_BIG:
-                std::cout << "La grille doit faire entre 3 et 20 cases..." << std::endl;
+            case TAILLE_TROP_PETITE:
+            case TAILLE_TROP_GRANDE:
+                std::cout << "La grille doit faire entre 5 et 30 cases" << std::endl;
                 break;
 
-            case INIT_SUCCESS:
-                std::cout << "La grille à bien été initialisé..." << std::endl;
+            case SUCCES_CREE:
+                std::cout << "Grille initialisée" << std::endl;
                 return;
 
             default:
@@ -239,7 +239,7 @@ void initBoard(int socket, BoardElements ** board)
         std::cout.flush();
         std::cin >> configuration;
 
-        sprintf(message, "%d|%s||", INIT_GRID, configuration);
+        sprintf(message, "%d|%s||", CREER_PLATEAU, configuration);
 
         if (send(socket, message, sizeof(message), 0) == -1){
             perror("send message : ");
@@ -260,16 +260,16 @@ void initBoard(int socket, BoardElements ** board)
             continue;
 
         switch (id) {
-            case ERR_BOAT_QTY:
+            case ERREUR_NB_BATEAU:
                 std::cout << "Il ne doit pas y avoir plus de 20% de la grille occupé par des bateaux soit : "
                           << boardSize * boardSize * 0.2 << " cases." << std::endl;
                 break;
 
-            case ERR_BOAT_OUTSIDE:
+            case ERREUR_DEPASSEMENT:
                 std::cout << "Les coordonnées ne sont pas valide." << std::endl;
                 break;
 
-            case GRID_SUCCESS:
+            case PLATEAU_CREE:
                 fillBoard(board, configuration);
                 display(board);
                 std::cout << "en Attente du deuxième joueur..." << std::endl;
