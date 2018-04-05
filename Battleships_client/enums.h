@@ -10,7 +10,7 @@ enum MsgTypes
     SUBSCRIBE_SUCCESS = 1015,
     SUBSCRIBE_FAILED = 1016,
 
-    ASK_INIT_GAME = 1050,
+    CREER_JEU = 1050,
 
     INIT_GAME = 1100,
     INIT_SUCCESS = 1105,
@@ -60,13 +60,13 @@ enum GameStatus
     RUNNING
 };
 
-enum BoardElements
+enum StatutCase
 {
-    EMPTY,
-    BOAT,
-    MISSED,
-    HITTED,
-    SINKED
+    VIDE,
+    OCCUPEE,
+    MANQUE,
+    TOUCHE,
+    COULE
 };
 
 #endif

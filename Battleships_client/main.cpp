@@ -6,36 +6,38 @@
 #include <iostream>
 #include <iomanip>
 
-#include "common/enums.h"
+#include "enums.h"
 
-#define MYPORT 44578
+#define MYPORT 32000
 #define MAXDATASIZE 200
 
-int boardSize;
+int taillePlateau;
 
-void joinGame(int socket);
-void initGame(int socket);
+void rejoindreJeu(int socket);
+void creerPlateau(int socket);
 
-void initBoard(int socket, BoardElements ** board);
-bool fillBoard(BoardElements ** board, const std::string &places);
-bool getCoordinate(const std::string &places, unsigned long & lastIndex, int & x, int & y);
+void initPlateauJoueur(int socket, StatutCase ** board);
+bool remplirPlateau(StatutCase ** board, const std::string &places);
+bool recupererVerifierCoordonnées(const std::string &places, unsigned long & lastIndex, int & x, int & y);
 
-bool startGame(int socket);
-bool runGame(int socket, BoardElements **board, BoardElements **adversaryBoard, bool playing);
-void updateBoard(MsgTypes type, BoardElements ** board, const std::string &message, unsigned long nextDelimiter);
+bool demarrerJeu(int socket);
+bool jouer(int socket, StatutCase **board, StatutCase **adversaryBoard, bool playing);
+void metAJourBateau(MsgTypes type, StatutCase ** board, const std::string &message, unsigned long nextDelimiter);
 
 bool getFireCoordinate(const std::string &message, unsigned long nextDelimiter, int &x, int &y);
-bool sinkedBoat(int x, int y, int addX, int addY, BoardElements ** board);
-bool sinkedBoat(int x, int y, BoardElements ** board);
+bool sinkedBoat(int x, int y, int addX, int addY, StatutCase ** board);
+bool sinkedBoat(int x, int y, StatutCase ** board);
 
-int getMessageID(const std::string &message, unsigned long &nextParameterPos);
-void display(BoardElements ** board);
-void display(BoardElements ** board, BoardElements ** adversaryBoard);
+int convertirCodeRetour(const std::string &message, unsigned long &nextParameterPos);
+void afficher(StatutCase ** board);
+void affiche(StatutCase ** board, StatutCase ** adversaryBoard);
+
+using namespace std;
 
 
 int main() {
 
-    // region socket configuration
+    //Socket config
 
     int sockfd;
 
@@ -56,119 +58,83 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    // Configuration Obligatoire
-
     sock_addr.sin_addr = serv_addr;
     sock_addr.sin_port = htons(MYPORT);
     sock_addr.sin_family = AF_INET;
     bzero(&(sock_addr.sin_zero), 8);
 
-    // endregion
-
-    // region Game Initialisation
 
     if (connect(sockfd, (struct sockaddr*) &sock_addr, sizeof(struct sockaddr)) == -1)
     {
-        perror("Connect");
+        perror("Connect error");
         exit(EXIT_FAILURE);
     }
 
-    joinGame(sockfd);
+    rejoindreJeu(sockfd);
 
-    // endregion
+	StatutCase** plateau = creerPlateauJoueur();
+	StatutCase** plateauAdverse = creerPlateauJoueur();
 
-    // region init Board
-
-    auto ** board = new BoardElements*[boardSize];
-    auto ** adversaryBoard = new BoardElements*[boardSize];
-
-    for (int i = 0; i < boardSize; i++)
-    {
-        board[i] = new BoardElements[boardSize];
-        adversaryBoard[i] = new BoardElements[boardSize];
-        for (int j = 0; j < boardSize; j++)
-        {
-            board[i][j] = EMPTY;
-            adversaryBoard[i][j] = EMPTY;
-        }
-    }
-
-    initBoard(sockfd, board);
-
-    // endregion
+	initPlateauJoueur(sockfd, plateau);
 
     // region Game Running
 
     bool winner;
-    if (startGame(sockfd))
-    {
-        std::cout << "c'est à vous de commencer !" << std::endl;
-        winner = runGame(sockfd, board, adversaryBoard, true);
-    }
+	bool premierTour = demarrerJeu(sockfd);
+
+    if (premierTour)
+        cout << "c'est à vous de commencer !" << endl;
+       
     else
-    {
-        std::cout << "c'est à votre adversaire de commencer !" << std::endl;
-        winner = runGame(sockfd, board, adversaryBoard, false);
-    }
+        cout << "c'est à votre adversaire de commencer !" << endl;
+
+	winner = jouer(sockfd, plateau, plateauAdverse, premierTour);
 
     if (winner)
-    {
-        std::cout << "Vous avez Gagné !" << std::endl;
-    }
+        cout << "Vous avez Gagné !" << endl;
+    
     else
-    {
-        std::cout << "Vous avez Perdu !" << std::endl;
-    }
+        cout << "Vous avez Perdu !" << endl;
+    
 
-    // endregion
 
-    // region Desalloc
-
-    for (int i = 0; i < boardSize; i++)
-    {
-        delete board[i];
-        delete adversaryBoard[i];
-    }
-    delete[] board;
-    delete[] adversaryBoard;
-
-    // endregion
-
+	detruirePlateau();
+   
     return 0;
 }
 
-void joinGame(int socket)
+void rejoindreJeu(int socket)
 {
-    std::cout << "Chargement..." << std::endl;
-    char message[MAXDATASIZE];
+   
+    char charMessage[MAXDATASIZE];
 
-    while (true) {
-        bzero(message, MAXDATASIZE);
-        if (recv(socket, &message, MAXDATASIZE, MSG_WAITALL) == -1) {
-            perror("Recv Error");
+    while (true) 
+	{
+        bzero(charMessage, MAXDATASIZE);
+        if (recv(socket, &charMessage, MAXDATASIZE, MSG_WAITALL) == -1)
+		{
+            perror("Receive error");
             exit(EXIT_FAILURE);
         }
 
-        std::string string(message);
+        string stringMessage(charMessage);
         unsigned long nextDelimiter;
-        int id;
-        std::string temp;
+        int code;
+        string tailleString;
 
-        if ((id = getMessageID(string, nextDelimiter)) == -1)
+        if ((code = convertirCodeRetour(stringMessage, nextDelimiter)) == -1)
             continue;
 
-        switch (id) {
-            case ASK_INIT_GAME:
-                initGame(socket);
-                std::cout << "En attente du deuxième joueur..." << std::endl;
+        switch (code) {
+            case CREER_JEU:
+                creerPlateau(socket);
+                cout << "Attente du deuxième joueur..." << endl;
                 break;
 
             case JOIN_SUCCESS:
-                temp = string.substr(nextDelimiter, string.find("||", nextDelimiter) - nextDelimiter);
-                std::cout << "La partie va bientot commencé ! La taille du plateau est de "
-                          << temp << " par " << temp << std::endl << std::endl;
-                std::cout << std::endl << "==============================================================" << std::endl;
-                boardSize = stoi(temp);
+				tailleString = stringMessage.substr(nextDelimiter, stringMessage.find("||", nextDelimiter) - nextDelimiter);
+                taillePlateau = stoi(tailleString);
+				cout << "La partie va commencer \n Taille du plateau : " << taillePlateau << "x" << taillePlateau << endl << endl;
                 return;
 
             default:
@@ -176,103 +142,121 @@ void joinGame(int socket)
         }
     }
 }
-void initGame(int socket)
+void creerPlateau(int socket)
 {
-    std::cout << "Veuillez entrer la taille du plateau (entre 3 et 20) :" << std::endl;
-    char message[MAXDATASIZE];
+    cout << "Taille du plateau (entre 3 et 20) :" << endl;
+    char charMessage[MAXDATASIZE];
 
     while (true) {
-        char inputSize[2];
-        std::cin >> inputSize;
+        char taille[2];
+        cin >> taille;
 
-        sprintf(message, "1100|%s||", inputSize);
+        sprintf(messageCode, "1100|%s||", taille);
 
-        if (send(socket, message, sizeof(message), 0) == -1){
-            perror("send message : ");
+        if (send(socket, messageCode, sizeof(messageCode), 0) == -1){
+            perror("Message envoi");
             exit(EXIT_FAILURE);
         }
 
-        bzero(message, MAXDATASIZE);
+        bzero(messageCode, MAXDATASIZE);
 
-        if (recv(socket, &message, MAXDATASIZE, MSG_WAITALL) == -1) {
-            perror("Recv Error");
+        if (recv(socket, &messageCode, MAXDATASIZE, MSG_WAITALL) == -1) {
+            perror("Reception");
             exit(EXIT_FAILURE);
         }
 
-        std::string string(message);
+        string stringMessage(message);
         unsigned long nextDelimiter;
         int id;
 
-        if ((id = getMessageID(string, nextDelimiter)) == -1)
+        if ((id = convertirCodeRetour(string, nextDelimiter)) == -1)
             continue;
 
         switch (id) {
             case BOARD_TOO_SMALL:
+				cout << "Taille trop petite (<3)" << endl;
             case BOARD_TOO_BIG:
-                std::cout << "La grille doit faire entre 3 et 20 cases..." << std::endl;
+                cout << "Taille trop grande (>20)" << endl;
                 break;
 
             case INIT_SUCCESS:
-                std::cout << "La grille à bien été initialisé..." << std::endl;
+                cout << "Grille créée" << endl;
                 return;
 
             default:
-                std::cout << "Veuillez entrer la taille du plateau (entre 3 et 20) :" << std::endl;
+                cout << "Entrer la taille du plateau (entre 3 et 20) :" << endl;
                 continue;
         }
     }
 }
 
-void initBoard(int socket, BoardElements ** board)
+
+StatutCase** creerPlateauJoueur()
 {
-    std::cout << "Veuillez rentrer les coordonnées de vos bateaux : " << std::endl
-              << "(Exemple : A1,A2,B3,C3)" << std::endl
-              << "il doit y avoir moins de 20% de bateaux" << std::endl;
-    char message[MAXDATASIZE];
-    char configuration[MAXDATASIZE - 20];
+	StatutCase** plateau = new StatutCase*[taillePlateau];
+
+	for (int i = 0; i < taillePlateau; i++)
+	{
+		plateau[i] = new StatutCase[taillePlateau];
+		for (int j = 0; j < taillePlateau; j++)
+			plateau[i][j] = VIDE;
+	}
+
+	return plateau
+}
+
+void initPlateauJoueur(int socket, StatutCase ** plateau)
+{
+
+	
+	cout << "Il doit y avoir maximum 20% des cases occupées par un bateau soit : 20% * " 
+		<< taillePlateau << "x" << taillePlateau << " : " << taillePlateau * taillePlateau * 0.2 << " cases.";
+              
+
+    char charMessage[MAXDATASIZE];
+    char confi[MAXDATASIZE - 20];
 
     while (true) {
-        display(board);
+        afficher(plateau);
 
-        bzero(message, MAXDATASIZE);
-        std::cout << "Entrez votre configuration : ";
-        std::cout.flush();
-        std::cin >> configuration;
+        bzero(charMessage, MAXDATASIZE);
+		cout << "Entrez toutes les cases occupées par un bateau : (Exemple : A1,A2,B3,C3)" << endl;
+		cout.flush();
+        cin >> config;
 
-        sprintf(message, "%d|%s||", INIT_GRID, configuration);
+        sprintf(charMessage, "%d|%s||", INIT_GRID, config);
 
-        if (send(socket, message, sizeof(message), 0) == -1){
+        if (send(socket, charMessage, sizeof(charMessage), 0) == -1){
             perror("send message : ");
             exit(EXIT_FAILURE);
         }
 
-        if (recv(socket, &message, MAXDATASIZE, MSG_WAITALL) == -1) {
+        if (recv(socket, &charMessage, MAXDATASIZE, MSG_WAITALL) == -1) {
             perror("Recv Error");
             exit(EXIT_FAILURE);
         }
 
-        std::string string(message);
+        string codeRetourString(charMessage);
         unsigned long nextDelimiter;
-        int id;
-        std::string temp;
+        int codeRetour;
 
-        if ((id = getMessageID(string, nextDelimiter)) == -1)
+        if ((codeRetour = convertirCodeRetour(codeRetourString, nextDelimiter)) == -1)
             continue;
 
-        switch (id) {
+        switch (codeRetour) {
             case ERR_BOAT_QTY:
-                std::cout << "Il ne doit pas y avoir plus de 20% de la grille occupé par des bateaux soit : "
-                          << boardSize * boardSize * 0.2 << " cases." << std::endl;
+				cout << "Il doit y avoir maximum 20% des cases occupées par un bateau soit : 20% * "
+					<< taillePlateau << "x" << taillePlateau << " = " << taillePlateau * taillePlateau * 0.2 << " cases.";
                 break;
 
             case ERR_BOAT_OUTSIDE:
-                std::cout << "Les coordonnées ne sont pas valide." << std::endl;
+                cout << "Les coordonnées ne sont pas valides." << endl;
                 break;
 
             case GRID_SUCCESS:
-                fillBoard(board, configuration);
-                display(board);
-                std::cout << "en Attente du deuxième joueur..." << std::endl;
+                remplirPlateau(plateau, config);
+                afficher(plateau);
+                cout << "Grille créée avec succès, en attente du deuxième joueur..." << endl;
                 return;
 
             default:
@@ -280,67 +264,60 @@ void initBoard(int socket, BoardElements ** board)
         }
     }
 }
-bool fillBoard(BoardElements ** board, const std::string &places)
+bool remplirPlateau(StatutCase ** plateau, const string &config)
 {
-    unsigned long lastIndex = 0;
-    std::string temp;
+    int lastIndex = 0;
+    string temp;
     int x,y;
+	bool coordonneesValides;
+	string id_string;
+	int temp = lastIndex;
 
-    while (true)
+    for(;;)
     {
-        if (getCoordinate(places, lastIndex, x, y))
-        {
-            if (x >= boardSize || x < 0 || y >= boardSize || y < 0)
-                return false;
+		try {
+			lastIndex = places.find_first_of(',', lastIndex);
+			id_string = places.substr(temp, (lastIndex++) - temp);
+			x = (int)id_string[0] - 65; //Récupère la lettre d'une coordonnée puis la transforme en chiffre
+			y = stoi(id_string.substr(1, id_string.length())) - 1; //Récupère le chiffre d'une coordonnée
+			coordonneesValides = (x <= taillePlateau && x > 0 && y <= taillePlateau && y > 0); //On test si les coordonnées sont trop grandes ou trop petites
+		}
+		catch (exception &e) {
+			coordonneesValides = false;
+		}
 
-            board[x][y] = BOAT;
+        if (coordonneesValides)
+        {
+            board[x][y] = OCCUPEE;
         }
         else
-        {
             return false;
-        }
-        if (lastIndex == 0) return true;
-    }
-}
-bool getCoordinate(const std::string &places, unsigned long & lastIndex, int & x, int & y)
-{
-    std::string id_string;
-    unsigned long temp = lastIndex;
-
-    try {
-        lastIndex = places.find_first_of(',', lastIndex);
-        id_string = places.substr(temp, lastIndex++ - temp);
-        x = (int)id_string[0] - 65;
-        y = stoi(id_string.substr(1, id_string.length())) - 1;
-
-        return true;
-    }
-    catch (std::exception &e) {
-        return false;
+        
+        if (lastIndex == 0) return true; //On a placé toutes les coordonnées, on sort de la boucle
     }
 }
 
-bool startGame(int socket)
+bool demarrerJeu(int socket)
 {
-    char message[MAXDATASIZE];
+    char charMessage[MAXDATASIZE];
 
     while (true) {
-        bzero(message, MAXDATASIZE);
+        bzero(charMessage, MAXDATASIZE);
 
-        if (recv(socket, &message, MAXDATASIZE, MSG_WAITALL) == -1) {
+        if (recv(socket, &charMessage, MAXDATASIZE, MSG_WAITALL) == -1) {
             perror("Recv Error");
             exit(EXIT_FAILURE);
         }
 
-        std::string string(message);
+        string string(charMessage);
         unsigned long nextDelimiter;
-        int id;
-        std::string temp;
+        int codeRetour;
+        string temp;
 
-        if ((id = getMessageID(string, nextDelimiter)) == -1)
+        if ((codeRetour = convertirCodeRetour(string, nextDelimiter)) == -1)
             continue;
 
-        switch (id) {
+        switch (codeRetour) {
             case START:
                 temp = string.substr(nextDelimiter, string.find("||", nextDelimiter) - nextDelimiter);
                 return temp == "true";
@@ -351,20 +328,21 @@ bool startGame(int socket)
     }
 }
 
-bool runGame(int socket, BoardElements **board, BoardElements **adversaryBoard, bool playing)
+bool jouer(int socket, StatutCase **plateau, StatutCase **plateauAdverse, bool playing)
 {
     char message[MAXDATASIZE];
     char configuration[3];
-    BoardElements  ** currentBoard;
+    StatutCase  ** plateauActuel;
 
-    display(board, adversaryBoard);
+    affiche(plateau, plateauAdverse);
+
     while (true) {
         bzero(message, MAXDATASIZE);
 
         if (playing)
         {
-            std::cout << "Entrez les coordonnées de tir :" << std::endl;
-            std::cin >> configuration;
+            cout << "Entrez la case de tir :" << std::endl;
+            cin >> configuration;
 
             sprintf(message, "%d|%s||", FIRE, configuration);
 
@@ -375,7 +353,7 @@ bool runGame(int socket, BoardElements **board, BoardElements **adversaryBoard, 
             bzero(message, MAXDATASIZE);
         }
 
-        currentBoard = (playing) ? adversaryBoard : board;
+		plateauActuel = (playing) ? plateauAdverse : plateau;
         playing = false;
 
         if (recv(socket, &message, MAXDATASIZE, MSG_WAITALL) == -1) {
@@ -383,40 +361,40 @@ bool runGame(int socket, BoardElements **board, BoardElements **adversaryBoard, 
             exit(EXIT_FAILURE);
         }
 
-        std::string string(message);
+        string string(message);
         unsigned long nextDelimiter;
-        int id;
-        std::string temp;
+        int codeRetour;
+        string temp;
 
-        if ((id = getMessageID(string, nextDelimiter)) == -1)
+        if ((codeRetour = convertirCodeRetour(string, nextDelimiter)) == -1)
             continue;
 
-        switch (id) {
+        switch (codeRetour) {
             case PLAY:
-                std::cout << "A vous de jouer !" << std::endl;
+                cout << "C'est a votre tour" << std::endl;
                 playing = true;
                 continue;
 
             case ERR_ALREADY_FIRED:
-                std::cout << "Vous avez déjà ciblé cette case..." << std::endl;
+                cout << "Vous avez déjà ciblé cette case..." << std::endl;
                 playing = true;
                 continue;
             case ERR_COORDINATE:
-                std::cout << "Coordonnées non valide..." << std::endl;
+                cout << "Coordonnées non valide..." << std::endl;
                 playing = true;
                 continue;
 
             case HIT:
             case SINK:
             case MISS:
-                updateBoard(static_cast<MsgTypes>(id), currentBoard, message, nextDelimiter);
-                display(board, adversaryBoard);
+                metAJourBateau(static_cast<MsgTypes>(codeRetour), plateauActuel, message, nextDelimiter);
+                affiche(plateau, plateauAdverse);
                 continue;
 
             case WIN:
             case LOOSE:
-                updateBoard(SINK, currentBoard, message, nextDelimiter);
-                display(board, adversaryBoard);
+                metAJourBateau(SINK, plateauActuel, message, nextDelimiter);
+                affiche(plateau, plateauAdverse);
                 return (id == WIN);
 
             default:
@@ -424,7 +402,7 @@ bool runGame(int socket, BoardElements **board, BoardElements **adversaryBoard, 
         }
     }
 }
-void updateBoard(MsgTypes type, BoardElements ** board, const std::string &message, unsigned long nextDelimiter)
+void metAJourBateau(MsgTypes type, StatutCase ** board, const std::string &message, unsigned long nextDelimiter)
 {
     int x, y;
     if (!getFireCoordinate(message, nextDelimiter, x, y)) return;
@@ -463,16 +441,16 @@ bool getFireCoordinate(const std::string &message, unsigned long nextDelimiter, 
         return false;
     }
 
-    return !(x >= boardSize || x < 0 || y >= boardSize || y < 0);
+    return !(x >= taillePlateau || x < 0 || y >= taillePlateau || y < 0);
 
 }
 
-bool sinkedBoat(int x, int y, int addX, int addY, BoardElements ** board)
+bool sinkedBoat(int x, int y, int addX, int addY, StatutCase ** board)
 {
-    if (x + addX < 0 || x + addX >= boardSize || y + addY < 0 && y + addY >= boardSize)
+    if (x + addX < 0 || x + addX >= taillePlateau || y + addY < 0 && y + addY >= taillePlateau)
         return true;
 
-    BoardElements element = board[x + addX][y + addY];
+    StatutCase element = board[x + addX][y + addY];
 
     if (element == BOAT)
         return false;
@@ -484,23 +462,23 @@ bool sinkedBoat(int x, int y, int addX, int addY, BoardElements ** board)
 
     return true;
 }
-bool sinkedBoat(int x, int y, BoardElements ** board)
+bool sinkedBoat(int x, int y, StatutCase ** board)
 {
     board[x][y] = SINKED;
 
-    if ((x + 1 < boardSize  && board[x + 1][y] == BOAT) ||
+    if ((x + 1 < taillePlateau  && board[x + 1][y] == BOAT) ||
         (x - 1 >= 0         && board[x - 1][y] == BOAT) ||
-        (y + 1 < boardSize  && board[x][y + 1] == BOAT) ||
+        (y + 1 < taillePlateau  && board[x][y + 1] == BOAT) ||
         (y - 1 >= 0         && board[x][y - 1] == BOAT))
     {
         return false;
     }
-    else if ((x + 1 < boardSize && board[x + 1][y] == HITTED) ||
+    else if ((x + 1 < taillePlateau && board[x + 1][y] == HITTED) ||
              (x - 1 >= 0        && board[x - 1][y] == HITTED))
     {
         return sinkedBoat(x, y, 1, 0, board) && sinkedBoat(x, y, -1, 0, board);
     }
-    else if ((y + 1 < boardSize && board[x][y + 1] == HITTED) ||
+    else if ((y + 1 < taillePlateau && board[x][y + 1] == HITTED) ||
              (y - 1 >= 0        && board[x][y - 1] == HITTED))
     {
         return sinkedBoat(x, y, 0, 1, board) && sinkedBoat(x, y, 0, -1, board);
@@ -510,7 +488,7 @@ bool sinkedBoat(int x, int y, BoardElements ** board)
 
 /* utilities */
 
-int getMessageID(const std::string &message, unsigned long &nextParameterPos)
+int convertirCodeRetour(const std::string &message, unsigned long &nextParameterPos)
 {
     std::string id_string;
 
@@ -540,7 +518,7 @@ char getGraphicRepresentationOf(BoardElements element)
             return '#';
     }
 }
-void display(BoardElements ** board)
+void afficher(StatutCase ** board)
 {
     std::cout << std::endl << "  ";
     for (int j = 0; j < boardSize; j++)
@@ -562,7 +540,7 @@ void display(BoardElements ** board)
     }
     std::cout << std::endl;
 }
-void display(BoardElements ** board, BoardElements ** adversaryBoard)
+void affiche(BoardElements ** board, BoardElements ** adversaryBoard)
 {
     std::cout << std::endl << std::setw(boardSize + 5) << "Votre Plateau" << "   "
               << "Plateau de l'adversaire" << std::endl;
@@ -598,4 +576,15 @@ void display(BoardElements ** board, BoardElements ** adversaryBoard)
         std::cout << std::endl;
     }
     std::cout << std::endl;
+}
+
+void detruirePlateau()
+{
+	for (int i = 0; i < taillePlateau; i++)
+	{
+		delete plateau[i];
+		delete plateauAdverse[i];
+	}
+	delete[] plateau;
+	delete[] plateauAdverse;
 }
