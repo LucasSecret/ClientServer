@@ -15,9 +15,8 @@ using namespace std;
 
 
 int boardSize;
-string entete = "SERVER>> ";
 
-int getMessageID(const string &msg, unsigned long &nextParameterPos)
+int getIdMsg(const string &msg, unsigned long &nextParameterPos)
 {
     string id_string;
 
@@ -31,28 +30,28 @@ int getMessageID(const string &msg, unsigned long &nextParameterPos)
     }
 }
 
-void initGame(int socket)
+void creerPartie(int socket)
 {
-    char msg[MAXDATASIZE];
+    string msg;
 
     while (true) {
-        bzero(msg, MAXDATASIZE);
+        msg = "";
         if (recv(socket, &msg, MAXDATASIZE, MSG_WAITALL) == -1) {
             perror("Erreur à la réception");
             exit(EXIT_FAILURE);
         }
 
-        string chaine(msg);
         unsigned long nextCom;
         int id;
 	string tmp;
 
-        if ((id = getMessageID(chaine, nextCom)) == -1)
+        if ((id = getIdMsg(msg, nextCom)) == -1)
             continue;
 
+	//verif message
         switch (id) {
             case INIT_GAME:
-                tmp = chaine.substr(nextCom, chaine.find('|', nextCom) - nextCom);
+                tmp = msg.substr(nextCom, msg.find('|', nextCom) - nextCom);
                 break;
 
             default:
@@ -72,7 +71,7 @@ void initGame(int socket)
             continue;
         }
 
-        if (boardSize < 3)
+        if (boardSize < 5)
         {
             if (send(socket, "1107||", sizeof("1107||"), 0) == -1){
                 perror("Envoie du message : ");
@@ -80,7 +79,7 @@ void initGame(int socket)
             }
             continue;
         }
-        else if (boardSize > 20)
+        else if (boardSize > 30)
         {
             if (send(socket, "1108||", sizeof("1108||"), 0) == -1){
                 perror("Envoie du message : ");
@@ -89,9 +88,9 @@ void initGame(int socket)
             continue;
         }
 
-        sprintf(msg, "%d||", INIT_SUCCESS);
+	msg = INIT_SUCCESS + "||";
 	
-        if (send(socket, msg, sizeof(msg), 0) == -1){
+        if (send(socket, &msg, sizeof(&msg), 0) == -1){
             perror("Envoie du message : ");
             exit(EXIT_FAILURE);
         }
@@ -100,7 +99,7 @@ void initGame(int socket)
     }
 }
 
-bool getCoordinate(const string &places, unsigned long & lastIndex, int & x, int & y)
+bool getPos(const string &places, unsigned long & lastIndex, int & x, int & y)
 {
     string id_string;
     unsigned long tmp = lastIndex;
@@ -118,7 +117,7 @@ bool getCoordinate(const string &places, unsigned long & lastIndex, int & x, int
     }
 }
 
-bool checkBoardValidity(int socket, BoardElements ** board)
+bool confirmerPlateau(int socket, BoardElements ** board)
 {
     int boatQty = 0;
 
@@ -139,7 +138,7 @@ bool checkBoardValidity(int socket, BoardElements ** board)
     return true;
 }
 
-bool fillBoard(BoardElements ** board, const string &places)
+bool initPlateau(BoardElements ** board, const string &places)
 {
     unsigned long lastIndex = 0;
     string tmp;
@@ -147,7 +146,7 @@ bool fillBoard(BoardElements ** board, const string &places)
 
     while (true)
     {
-        if (getCoordinate(places, lastIndex, x, y))
+        if (getPos(places, lastIndex, x, y))
         {
             if (x >= boardSize || x < 0 || y >= boardSize || y < 0)
                 return false;
@@ -162,12 +161,12 @@ bool fillBoard(BoardElements ** board, const string &places)
     }
 }
 
-void initBoard(int socket, BoardElements ** board)
+void preparePlateau(int socket, BoardElements ** board)
 {
-    char msg[MAXDATASIZE];
+    string msg;
 
     while (true) {
-        bzero(msg, MAXDATASIZE);
+        msg = "";
         if (recv(socket, &msg, MAXDATASIZE, MSG_WAITALL) == -1) {
             perror("Erreur de réception : ");
             exit(EXIT_FAILURE);
@@ -177,17 +176,16 @@ void initBoard(int socket, BoardElements ** board)
             for (int j = 0; j < boardSize; j++)
                 board[i][j] = EMPTY;
 
-        string chaine(msg);
         unsigned long nextCom;
         int id;
         string tmp;
 
-        if ((id = getMessageID(chaine, nextCom)) == -1)
+        if ((id = getIdMsg(msg, nextCom)) == -1)
             continue;
 
         switch (id) {
             case INIT_GRID:
-                tmp = chaine.substr(nextCom, chaine.find('|', nextCom) - nextCom);
+                tmp = msg.substr(nextCom, msg.find('|', nextCom) - nextCom);
                 break;
 
             default:
@@ -196,7 +194,7 @@ void initBoard(int socket, BoardElements ** board)
                 continue;
         }
 
-        if (!fillBoard(board, tmp))
+        if (!initPlateau(board, tmp))
         {
             if (send(socket, "1148||", sizeof("1148||"), 0) == -1){
                 perror("send message : ");
@@ -205,7 +203,7 @@ void initBoard(int socket, BoardElements ** board)
             continue;
         }
 
-        if (checkBoardValidity(socket, board))
+        if (confirmerPlateau(socket, board))
         {
             if (send(socket, "1145||", sizeof("1145||"), 0) == -1){
                 perror("send message : ");
@@ -216,7 +214,7 @@ void initBoard(int socket, BoardElements ** board)
     }
 }
 
-bool getAttackTarget(const string &msg, unsigned long nextCom, int &x, int &y)
+bool getCible(const string &msg, unsigned long nextCom, int &x, int &y)
 {
     try {
         unsigned long lastIndex = msg.find_first_of('|', nextCom);
@@ -233,7 +231,7 @@ bool getAttackTarget(const string &msg, unsigned long nextCom, int &x, int &y)
 
 }
 
-bool boatSink(int x, int y, int addX, int addY, BoardElements ** adversaryBoard)
+bool couleBateau(int x, int y, int addX, int addY, BoardElements ** adversaryBoard)
 {
     if (x + addX < 0 || x + addX >= boardSize || y + addY < 0 && y + addY >= boardSize)
         return true;
@@ -243,12 +241,12 @@ bool boatSink(int x, int y, int addX, int addY, BoardElements ** adversaryBoard)
     if (element == BOAT)
         return false;
     if (element == HITTED)
-        return boatSink(x + addX, y + addY, addX, addY, adversaryBoard);
+        return couleBateau(x + addX, y + addY, addX, addY, adversaryBoard);
 
     return true;
 }
 
-bool boatSinked(int x, int y, BoardElements ** adversaryBoard)
+bool couleBateau(int x, int y, BoardElements ** adversaryBoard)
 {
     if ((x + 1 < boardSize  && adversaryBoard[x + 1][y] == BOAT) ||
         (x - 1 >= 0         && adversaryBoard[x - 1][y] == BOAT) ||
@@ -260,17 +258,17 @@ bool boatSinked(int x, int y, BoardElements ** adversaryBoard)
     else if ((x + 1 < boardSize && adversaryBoard[x + 1][y] == HITTED) ||
              (x - 1 >= 0        && adversaryBoard[x - 1][y] == HITTED))
     {
-        return boatSink(x, y, 1, 0, adversaryBoard) && boatSink(x, y, -1, 0, adversaryBoard);
+        return couleBateau(x, y, 1, 0, adversaryBoard) && couleBateau(x, y, -1, 0, adversaryBoard);
     }
     else if ((y + 1 < boardSize && adversaryBoard[x][y + 1] == HITTED) ||
              (y - 1 >= 0        && adversaryBoard[x][y - 1] == HITTED))
     {
-        return boatSink(x, y, 0, 1, adversaryBoard) && boatSink(x, y, 0, -1, adversaryBoard);
+        return couleBateau(x, y, 0, 1, adversaryBoard) && couleBateau(x, y, 0, -1, adversaryBoard);
     }
 
 }
 
-bool boardContainsBoat(BoardElements ** adversaryBoard)
+bool verifPlateau(BoardElements ** adversaryBoard)
 {
     for (int i = 0; i < boardSize; i++)
         for (int j = 0; j < boardSize; j++)
@@ -280,29 +278,28 @@ bool boardContainsBoat(BoardElements ** adversaryBoard)
     return false;
 }
 
-MsgTypes play(int socket, BoardElements ** adversaryBoard, int &x, int &y)
+MsgTypes jouer(int socket, BoardElements ** adversaryBoard, int &x, int &y)
 {
-    char msg[MAXDATASIZE];
+    string msg;
 
     while (true)
     {
-        bzero(msg, MAXDATASIZE);
+        msg = "";
         if (recv(socket, &msg, MAXDATASIZE, MSG_WAITALL) == -1) {
             perror("Erreur à la réception");
             exit(EXIT_FAILURE);
         }
 
-        string chaine(msg);
         unsigned long nextCom;
         int id;
         string tmp;
 
-        if ((id = getMessageID(chaine, nextCom)) == -1)
+        if ((id = getIdMsg(msg, nextCom)) == -1)
             continue;
 
         switch (id) {
             case FIRE:
-                if (!getAttackTarget(msg, nextCom, x, y))
+                if (!getCible(msg, nextCom, x, y))
                 {
                     if (send(socket, "1506||", sizeof("1506||"), 0) == -1){
                         perror("Envoie du message : ");
@@ -337,9 +334,9 @@ MsgTypes play(int socket, BoardElements ** adversaryBoard, int &x, int &y)
         {
             adversaryBoard[x][y] = HITTED;
 
-            if (boatSinked(x, y, adversaryBoard))
+            if (couleBateau(x, y, adversaryBoard))
             {
-                if (!boardContainsBoat(adversaryBoard))
+                if (!verifPlateau(adversaryBoard))
                 {
                     return WIN;
                 }
@@ -377,7 +374,7 @@ int main()
         exit(EXIT_FAILURE);
     }
     else{
-    	cout<<entete<<"L'initialisation c'est terminée correctement"<<endl;
+    	cout<<"SERVER>> L'initialisation c'est terminée correctement"<<endl;
     }
 
     // Configuration de l'adresse de transport
@@ -393,7 +390,7 @@ int main()
         exit(EXIT_FAILURE);
     }
     else{
-        cout<<entete<<"En attente du 1er client"<<endl;
+        cout<<"SERVER>> En attente du 1er client"<<endl;
     }
     //endregion
 
@@ -415,7 +412,7 @@ int main()
         exit(EXIT_FAILURE);
     }
     else{
-	cout<<entete<<"Le client 1 c'est connecté"<<endl;
+	cout<<"SERVER>> Le client 1 c'est connecté"<<endl;
     }
 
     if (send(p1_fd, "1050||", sizeof("1050||"), 0) == -1){
@@ -424,7 +421,7 @@ int main()
     }
     //endregion
 
-    thread init_game(initGame, p1_fd);
+    thread init_game(creerPartie, p1_fd);
 
     //region Second User Connection
     int p2_fd{};
@@ -435,21 +432,20 @@ int main()
         exit(EXIT_FAILURE);
     }
     else{
-	cout<<entete<<"Le client 2 c'est connecté"<<endl;
+	cout<<"SERVER>> Le client 2 c'est connecté"<<endl;
     }
     //endregion
 
     //region Init Game & Board
     init_game.join();
 
-    char buf[20];
-    sprintf(buf, "%d|%d||", JOIN_SUCCESS, boardSize);
+    string buf = JOIN_SUCCESS + "|" + to_string(boardSize) + "||";
 
-    if (send(p1_fd, buf, sizeof(buf), 0) == -1){
+    if (send(p1_fd, &buf, sizeof(&buf), 0) == -1){
         perror("Envoie du message : ");
         exit(EXIT_FAILURE);
     }
-    if (send(p2_fd, buf, sizeof(buf), 0) == -1){
+    if (send(p2_fd, &buf, sizeof(&buf), 0) == -1){
         perror("Envoie du message : ");
         exit(EXIT_FAILURE);
     }
@@ -463,8 +459,8 @@ int main()
         P2Board[i] = new BoardElements[boardSize];
     }
 
-    thread init_p1(initBoard, p1_fd, P1Board);
-    thread init_p2(initBoard, p2_fd, P2Board);
+    thread init_p1(preparePlateau, p1_fd, P1Board);
+    thread init_p2(preparePlateau, p2_fd, P2Board);
 
     init_p1.join();
     init_p2.join();
@@ -472,28 +468,28 @@ int main()
     // endregion
 
     // region Launch Game
-    cout<<entete<<"Une partie à commencé"<<endl;
+    cout<<"SERVER>> Une partie à commencé"<<endl;
 
-    char startMessageP1[11];
-    char startMessageP2[11];
+    string startMessageP1;
+    string startMessageP2;
     bool isFirstPlayerTurn = (random() % 2 == 0);
 
     if (isFirstPlayerTurn)
     {
-        strcpy(startMessageP1, "1500|true||");
-        strcpy(startMessageP2, "1500|false||");
+        startMessageP1 = "1500|true||";
+        startMessageP2 = "1500|false||";
     }
     else
     {
-        strcpy(startMessageP2, "1500|true||");
-        strcpy(startMessageP1, "1500|false||");
+        startMessageP2 = "1500|true||";
+        startMessageP1 = "1500|false||";
     }
 
-    if (send(p1_fd, startMessageP1, sizeof(startMessageP1), 0) == -1){
+    if (send(p1_fd, &startMessageP1, sizeof(&startMessageP1), 0) == -1){
         perror("Envoie du message : ");
         exit(EXIT_FAILURE);
     }
-    if (send(p2_fd, startMessageP2, sizeof(startMessageP2), 0) == -1){
+    if (send(p2_fd, &startMessageP2, sizeof(&startMessageP2), 0) == -1){
         perror("Envoie du message : ");
         exit(EXIT_FAILURE);
     }
@@ -504,13 +500,13 @@ int main()
     bool gameRunning = true;
     int x = 0, y = 0;
     MsgTypes msgType;
-    char *msg = new char[32];
+    string msg;
     while(gameRunning)
     {
         if (isFirstPlayerTurn)
-            msgType = play(p1_fd, P2Board, x, y);
+            msgType = jouer(p1_fd, P2Board, x, y);
         else
-            msgType = play(p2_fd, P1Board, x, y);
+            msgType = jouer(p2_fd, P1Board, x, y);
 
         switch(msgType)
         {
@@ -534,13 +530,13 @@ int main()
 
         if (gameRunning)
         {
-            sprintf(msg, "%d|%c%d||", msgType, (x + 65), y + 1);
+	    msg = msgType + "|" + to_string(x + 65) + to_string(y + 1) + "||";
 
-            if (send(p1_fd, msg, sizeof(msg), 0) == -1){
+            if (send(p1_fd, &msg, sizeof(&msg), 0) == -1){
                 perror("Envoie du message : ");
                 exit(EXIT_FAILURE);
             }
-            if (send(p2_fd, msg, sizeof(msg), 0) == -1){
+            if (send(p2_fd, &msg, sizeof(&msg), 0) == -1){
                 perror("Envoie du message : ");
                 exit(EXIT_FAILURE);
             }
@@ -559,17 +555,17 @@ int main()
 
     // region End Game
     
-    cout<<entete<<"Game finished"<<endl;
+    cout<<"SERVER>> Game finished"<<endl;
     int winner = (isFirstPlayerTurn) ? p1_fd : p2_fd;
     int looser = (isFirstPlayerTurn) ? p2_fd : p1_fd;
 
-    sprintf(msg, "%d|%c%d||", WIN, (x + 65), y + 1);
-    if (send(winner, msg, sizeof(msg), 0) == -1) {
+    msg = WIN + "|" + to_string(x + 65) + to_string(y + 1) + "||";
+    if (send(winner, &msg, sizeof(&msg), 0) == -1) {
         perror("Envoie du message : ");
         exit(EXIT_FAILURE);
     }
-    sprintf(msg, "%d|%c%d||", LOOSE, (x + 65), y + 1);
-    if (send(looser, msg, sizeof(msg), 0) == -1) {
+    msg = LOOSE + "|" + to_string(x + 65) + to_string(y + 1) + "||";
+    if (send(looser, &msg, sizeof(&msg), 0) == -1) {
         perror("Envoie du message : ");
         exit(EXIT_FAILURE);
     }
@@ -578,7 +574,7 @@ int main()
 
     // region Desalloc
     
-    cout<<entete<<"Stopping session"<<endl;
+    cout<<"SERVER>> Stopping session"<<endl;
     for (int i = 0; i < boardSize; i++)
     {
         delete P1Board[i];
