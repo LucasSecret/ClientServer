@@ -24,33 +24,30 @@ bool demarrerJeu(int socket);
 bool jouer(int socket, StatutCase **board, StatutCase **adversaryBoard, bool playing);
 void metAJourBateau(MsgTypes type, StatutCase ** board, const std::string &message, unsigned long nextDelimiter);
 
-bool getFireCoordinate(const std::string &message, unsigned long nextDelimiter, int &x, int &y);
-bool sinkedBoat(int x, int y, int addX, int addY, StatutCase ** board);
-bool sinkedBoat(int x, int y, StatutCase ** board);
+bool couleBateau(int x, int y, int addX, int addY, StatutCase ** board);
+bool couleBateau(int x, int y, StatutCase ** board);
 
 int convertirCodeRetour(const std::string &message, unsigned long &nextParameterPos);
 void afficher(StatutCase ** board);
-void affiche(StatutCase ** board, StatutCase ** adversaryBoard);
+void afficher(StatutCase ** board, StatutCase ** adversaryBoard);
 
 using namespace std;
 
 
 int main() {
 
-    //Socket config
+    //Configuration des sockets
 
     int sockfd;
-
     struct sockaddr_in sock_addr{};
     struct in_addr serv_addr{};
+	char inputIP[15] = "127.0.0.1";
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
         perror("Creation socket : ");
         exit(EXIT_FAILURE);
     }
-
-    char inputIP[15] = "127.0.0.1";
 
     if ((serv_addr.s_addr = inet_addr(inputIP)) == INADDR_NONE)
     {
@@ -62,41 +59,38 @@ int main() {
     sock_addr.sin_port = htons(MYPORT);
     sock_addr.sin_family = AF_INET;
     bzero(&(sock_addr.sin_zero), 8);
-
-
+	
     if (connect(sockfd, (struct sockaddr*) &sock_addr, sizeof(struct sockaddr)) == -1)
     {
         perror("Connect error");
         exit(EXIT_FAILURE);
     }
 
-    rejoindreJeu(sockfd);
+    rejoindreJeu(sockfd); //On attent qu'un deuxième joueur se connecte
 
 	StatutCase** plateau = creerPlateauJoueur();
 	StatutCase** plateauAdverse = creerPlateauJoueur();
 
-	initPlateauJoueur(sockfd, plateau);
+	initPlateauJoueur(sockfd, plateau); //Demande au joueur de placer ses bateaux sur sa grille
 
-    // region Game Running
+    bool vainqueur;
+	bool joueEnPremier = demarrerJeu(sockfd); // On recoit la réponse du serveur qui démarre le jeu 
+											  // et définit le premier joueur
 
-    bool winner;
-	bool premierTour = demarrerJeu(sockfd);
-
-    if (premierTour)
-        cout << "c'est à vous de commencer !" << endl;
+    if (joueEnPremier)
+        cout << "Vous commencez. " << endl;
        
     else
-        cout << "c'est à votre adversaire de commencer !" << endl;
+        cout << "Votre adversaire commence !" << endl;
 
-	winner = jouer(sockfd, plateau, plateauAdverse, premierTour);
+	vainqueur = jouer(sockfd, plateau, plateauAdverse, joueEnPremier); //Ici se déroule le jeu
 
-    if (winner)
-        cout << "Vous avez Gagné !" << endl;
+    if (vainqueur)
+        cout << "Vous avez gagné" << endl;
     
     else
-        cout << "Vous avez Perdu !" << endl;
+        cout << "Vous avez perdu" << endl;
     
-
 
 	detruirePlateau();
    
@@ -117,12 +111,12 @@ void rejoindreJeu(int socket)
             exit(EXIT_FAILURE);
         }
 
-        string stringMessage(charMessage);
+        string stringMessage = charMessage;
         unsigned long nextDelimiter;
         int code;
         string tailleString;
 
-        if ((code = convertirCodeRetour(stringMessage, nextDelimiter)) == -1)
+        if ((code = convertirCodeRetour(stringMessage, nextDelimiter)) == -1) 
             continue;
 
         switch (code) {
@@ -174,9 +168,9 @@ void creerPlateau(int socket)
 
         switch (id) {
             case BOARD_TOO_SMALL:
-				cout << "Taille trop petite (<3)" << endl;
+				cout << "Taille trop petite (<5)" << endl;
             case BOARD_TOO_BIG:
-                cout << "Taille trop grande (>20)" << endl;
+                cout << "Taille trop grande (>30)" << endl;
                 break;
 
             case INIT_SUCCESS:
@@ -184,7 +178,7 @@ void creerPlateau(int socket)
                 return;
 
             default:
-                cout << "Entrer la taille du plateau (entre 3 et 20) :" << endl;
+                cout << "Entrer la taille du plateau (entre 5 et 30) :" << endl;
                 continue;
         }
     }
@@ -207,12 +201,9 @@ StatutCase** creerPlateauJoueur()
 
 void initPlateauJoueur(int socket, StatutCase ** plateau)
 {
-
-	
 	cout << "Il doit y avoir maximum 20% des cases occupées par un bateau soit : 20% * " 
 		<< taillePlateau << "x" << taillePlateau << " : " << taillePlateau * taillePlateau * 0.2 << " cases.";
               
-
     char charMessage[MAXDATASIZE];
     char confi[MAXDATASIZE - 20];
 
@@ -264,6 +255,8 @@ void initPlateauJoueur(int socket, StatutCase ** plateau)
         }
     }
 }
+
+
 bool remplirPlateau(StatutCase ** plateau, const string &config)
 {
     int lastIndex = 0;
@@ -287,9 +280,8 @@ bool remplirPlateau(StatutCase ** plateau, const string &config)
 		}
 
         if (coordonneesValides)
-        {
             board[x][y] = OCCUPEE;
-        }
+        
         else
             return false;
         
@@ -312,15 +304,15 @@ bool demarrerJeu(int socket)
         string string(charMessage);
         unsigned long nextDelimiter;
         int codeRetour;
-        string temp;
+		string joueEnPremier;
 
         if ((codeRetour = convertirCodeRetour(string, nextDelimiter)) == -1)
             continue;
 
         switch (codeRetour) {
             case START:
-                temp = string.substr(nextDelimiter, string.find("||", nextDelimiter) - nextDelimiter);
-                return temp == "true";
+                joueEnPremier = string.substr(nextDelimiter, string.find("||", nextDelimiter) - nextDelimiter);
+                return joueEnPremier == "true";
 
             default:
                 continue;
@@ -334,29 +326,30 @@ bool jouer(int socket, StatutCase **plateau, StatutCase **plateauAdverse, bool p
     char configuration[3];
     StatutCase  ** plateauActuel;
 
-    affiche(plateau, plateauAdverse);
+    afficher(plateau, plateauAdverse);
 
     while (true) {
         bzero(message, MAXDATASIZE);
+		bzero(configuration, 3);
 
         if (playing)
         {
-            cout << "Entrez la case de tir :" << std::endl;
+            cout << "Entrez la case sur laquelle vous voulez tirer :" << std::endl;
             cin >> configuration;
 
-            sprintf(message, "%d|%s||", FIRE, configuration);
+            sprintf(message, "%d|%s||", FIRE, configuration); 
 
-            if (send(socket, message, sizeof(message), 0) == -1){
+            if (send(socket, message, sizeof(message), 0) == -1){ //Envoie de la case choisie
                 perror("send message : ");
                 exit(EXIT_FAILURE);
             }
-            bzero(message, MAXDATASIZE);
+            bzero(message, MAXDATASIZE); //Réinitialisation du buffer
         }
 
 		plateauActuel = (playing) ? plateauAdverse : plateau;
         playing = false;
 
-        if (recv(socket, &message, MAXDATASIZE, MSG_WAITALL) == -1) {
+        if (recv(socket, &message, MAXDATASIZE, MSG_WAITALL) == -1) { //On recoit la réponse du serveur
             perror("Recv Error");
             exit(EXIT_FAILURE);
         }
@@ -366,36 +359,36 @@ bool jouer(int socket, StatutCase **plateau, StatutCase **plateauAdverse, bool p
         int codeRetour;
         string temp;
 
-        if ((codeRetour = convertirCodeRetour(string, nextDelimiter)) == -1)
+        if ((codeRetour = convertirCodeRetour(string, nextDelimiter)) == -1) //Récupère et vérifie le code de retour envoyé par le serveur
             continue;
 
         switch (codeRetour) {
-            case PLAY:
-                cout << "C'est a votre tour" << std::endl;
+            case PLAY: 
+                cout << "C'est a votre tour." << std::endl;
                 playing = true;
                 continue;
 
             case ERR_ALREADY_FIRED:
-                cout << "Vous avez déjà ciblé cette case..." << std::endl;
+                cout << "Vous avez déjà tiré sur cette case." << std::endl;
                 playing = true;
                 continue;
             case ERR_COORDINATE:
-                cout << "Coordonnées non valide..." << std::endl;
+                cout << "Coordonnées non valides." << std::endl;
                 playing = true;
                 continue;
 
-            case HIT:
-            case SINK:
-            case MISS:
+            case TOUCHE:
+            case COULE:
+            case MANQUE:
                 metAJourBateau(static_cast<MsgTypes>(codeRetour), plateauActuel, message, nextDelimiter);
-                affiche(plateau, plateauAdverse);
+                afficher(plateau, plateauAdverse);
                 continue;
 
             case WIN:
             case LOOSE:
-                metAJourBateau(SINK, plateauActuel, message, nextDelimiter);
-                affiche(plateau, plateauAdverse);
-                return (id == WIN);
+                metAJourBateau(COULE, plateauActuel, message, nextDelimiter);
+                afficher(plateau, plateauAdverse);
+                return (codeRetour == WIN); 
 
             default:
                 continue;
@@ -405,88 +398,81 @@ bool jouer(int socket, StatutCase **plateau, StatutCase **plateauAdverse, bool p
 void metAJourBateau(MsgTypes type, StatutCase ** board, const std::string &message, unsigned long nextDelimiter)
 {
     int x, y;
-    if (!getFireCoordinate(message, nextDelimiter, x, y)) return;
+
+	try { //vérifie et récupère les coordonnées envoyées par le serveur 
+		unsigned long lastIndex = message.find_first_of('|', nextDelimiter);
+		std::string id_string = message.substr(nextDelimiter, lastIndex - nextDelimiter);
+		x = (int)id_string[0] - 65;
+		y = stoi(id_string.substr(1, id_string.length())) - 1;
+
+		if (x >= taillePlateau || x < 0 || y >= taillePlateau || y < 0)
+			return;
+	}
+	catch (std::exception &e)
+		return;
+
+	
 
     switch (type)
     {
-        case HIT:
-            std::cout << "Touché !" << std::endl;
-            board[x][y] = HITTED;
+        case TOUCHE:
+            cout << "Touché !" << endl;
+            board[x][y] = TOUCHE;
             return;
 
-        case MISS:
-            std::cout << "Loupé !" << std::endl;
-            board[x][y] = MISSED;
+        case MANQUE:
+            cout << "Manqué !" << endl;
+            board[x][y] = MANQUE;
             return;
 
-        case SINK:
-            std::cout << "Coulé !" << std::endl;
-            sinkedBoat(x, y, board);
+        case COULE:
+            cout << "Coulé !" << endl;
+            couleBateau(x, y, board);
             return;
 
         default:
             return;
     }
 }
-bool getFireCoordinate(const std::string &message, unsigned long nextDelimiter, int &x, int &y)
-{
-    try {
-        unsigned long lastIndex = message.find_first_of('|', nextDelimiter);
-        std::string id_string = message.substr(nextDelimiter, lastIndex - nextDelimiter);
-        x = (int)id_string[0] - 65;
-        y = stoi(id_string.substr(1, id_string.length())) - 1;
-    }
-    catch (std::exception &e)
-    {
-        return false;
-    }
 
-    return !(x >= taillePlateau || x < 0 || y >= taillePlateau || y < 0);
 
-}
 
-bool sinkedBoat(int x, int y, int addX, int addY, StatutCase ** board)
+bool couleBateau(int x, int y, int addX, int addY, StatutCase ** board)
 {
     if (x + addX < 0 || x + addX >= taillePlateau || y + addY < 0 && y + addY >= taillePlateau)
         return true;
 
     StatutCase element = board[x + addX][y + addY];
 
-    if (element == BOAT)
+    if (element == OCCUPEE)
         return false;
-    if (element == HITTED)
+    if (element == TOUCHE)
     {
-        board[x + addX][y + addY] = SINKED;
-        return sinkedBoat(x + addX, y + addY, addX, addY, board);
+        board[x + addX][y + addY] = COULE;
+        return couleBateau(x + addX, y + addY, addX, addY, board);
     }
 
     return true;
 }
-bool sinkedBoat(int x, int y, StatutCase ** board)
-{
-    board[x][y] = SINKED;
 
-    if ((x + 1 < taillePlateau  && board[x + 1][y] == BOAT) ||
-        (x - 1 >= 0         && board[x - 1][y] == BOAT) ||
-        (y + 1 < taillePlateau  && board[x][y + 1] == BOAT) ||
-        (y - 1 >= 0         && board[x][y - 1] == BOAT))
-    {
+
+
+bool couleBateau(int x, int y, StatutCase ** plateau)
+{
+    board[x][y] = COULE;
+
+    if ((x + 1 < taillePlateau  && plateau[x + 1][y] == OCCUPEE) || (x - 1 >= 0 && plateau[x - 1][y] == OCCUPEE) ||
+        (y + 1 < taillePlateau  && plateau[x][y + 1] == OCCUPEE) || (y - 1 >= 0 && plateau[x][y - 1] == OCCUPEE))
         return false;
-    }
-    else if ((x + 1 < taillePlateau && board[x + 1][y] == HITTED) ||
-             (x - 1 >= 0        && board[x - 1][y] == HITTED))
-    {
-        return sinkedBoat(x, y, 1, 0, board) && sinkedBoat(x, y, -1, 0, board);
-    }
-    else if ((y + 1 < taillePlateau && board[x][y + 1] == HITTED) ||
-             (y - 1 >= 0        && board[x][y - 1] == HITTED))
-    {
-        return sinkedBoat(x, y, 0, 1, board) && sinkedBoat(x, y, 0, -1, board);
-    }
+    
+    else if ((x + 1 < taillePlateau && plateau[x + 1][y] == TOUCHE) || (x - 1 >= 0 && plateau[x - 1][y] == TOUCHE))
+        return couleBateau(x, y, 1, 0, plateau) && couleBateau(x, y, -1, 0, plateau);
+    
+    else if ((y + 1 < taillePlateau && plateau[x][y + 1] == TOUCHE) || (y - 1 >= 0 && plateau[x][y - 1] == TOUCHE))
+        return couleBateau(x, y, 0, 1, plateau) && couleBateau(x, y, 0, -1, plateau);
+    
 
 }
-
-/* utilities */
 
 int convertirCodeRetour(const std::string &message, unsigned long &nextParameterPos)
 {
@@ -502,80 +488,71 @@ int convertirCodeRetour(const std::string &message, unsigned long &nextParameter
     }
 }
 
-char getGraphicRepresentationOf(BoardElements element)
+char afficheCase(BoardElements element)
 {
     switch (element)
     {
-        case EMPTY:
+        case VIDE:
             return ' ';
-        case BOAT:
-            return 'B';
-        case MISSED:
+        case OCCUPEE:
             return 'O';
-        case HITTED:
-            return 'x';
-        case SINKED:
+        case MANQUE:
+            return 'M';
+        case TOUCHE:
+            return 'T';
+        case COULE:
             return '#';
     }
 }
-void afficher(StatutCase ** board)
+void afficher(StatutCase ** plateau)
 {
-    std::cout << std::endl << "  ";
-    for (int j = 0; j < boardSize; j++)
+    cout << endl << "  ";
+    for (int i = 0; i < taillePlateau; i++)
+        cout << i + 1 << " ";
+
+    cout << endl << endl;
+
+    for (int i = 0; i < taillePlateau; i++)
     {
-        std::cout << j + 1 << " ";
+        cout << (char)(i+65) << "|";
+
+        for (int j = 0; j < taillePlateau; j++)
+            std::cout << afficheCase(plateau[i][j]) << " ";
+
+        cout << endl;
     }
-    std::cout << std::endl;
-
-    for (int i = 0; i < boardSize; i++)
-    {
-        std::cout << (char)(i+65) << "|";
-
-        for (int j = 0; j < boardSize; j++)
-        {
-            std::cout << getGraphicRepresentationOf(board[i][j]) << ' ';
-        }
-
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
+    cout << endl << endl;
 }
-void affiche(BoardElements ** board, BoardElements ** adversaryBoard)
+void afficher(StatutCase ** plateau, StatutCase ** plateauAdverse)
 {
-    std::cout << std::endl << std::setw(boardSize + 5) << "Votre Plateau" << "   "
-              << "Plateau de l'adversaire" << std::endl;
+    cout <<endl << setw(taillePlateau + 5) << "Votre plateau" << "     " << "Plateau de l'adversaire" << endl << " ";
 
-    std::cout << "  ";
-    for (int j = 0; j < boardSize; j++)
+	for (int i = 0; i < taillePlateau; i++) //Première ligne de chiffre pour le premier plateau
+        cout << i + 1 << " ";
+    
+    cout << "     ";
+    for (int i = 0; i < taillePlateau; i++) //Première ligne de chiffre pour le deuxième plateau
+        cout << i + 1 << " ";
+    
+    cout << endl;
+
+    for (int i = 0; i < taillePlateau; i++) //Affichage ligne par ligne des deux plateaux à coté
     {
-        std::cout << j + 1 << " ";
+        cout << (char)(i+65) << "|";
+
+        for (int j = 0; j < taillePlateau; j++) //Plateau du joueur
+            cout << afficheCase(plateau[i][j]) << ' ';
+        
+
+        cout << "   " << (char)(i+65) << "|";
+
+        for (int j = 0; j < taillePlateau; j++) //Plateau adversaire
+            cout << afficheCase(plateauAdverse[i][j]) << ' ';
+        
+
+        cout << endl;
     }
-    std::cout << "     ";
-    for (int j = 0; j < boardSize; j++)
-    {
-        std::cout << j + 1 << " ";
-    }
-    std::cout << std::endl;
-
-    for (int i = 0; i < boardSize; i++)
-    {
-        std::cout << (char)(i+65) << "|";
-
-        for (int j = 0; j < boardSize; j++)
-        {
-            std::cout << getGraphicRepresentationOf(board[i][j]) << ' ';
-        }
-
-        std::cout << "   " << (char)(i+65) << "|";
-
-        for (int j = 0; j < boardSize; j++)
-        {
-            std::cout << getGraphicRepresentationOf(adversaryBoard[i][j]) << ' ';
-        }
-
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
+    cout << endl;
 }
 
 void detruirePlateau()
