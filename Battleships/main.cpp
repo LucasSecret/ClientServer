@@ -205,7 +205,7 @@ void preparePlateau(int socket, BoardElements ** board)
 
         if (confirmerPlateau(socket, board))
         {
-            if (send(socket, "1145||", sizeof("1145||"), 0) == -1){
+            if (send(socket, "021||", sizeof("021||"), 0) == -1){
                 perror("send message : ");
                 exit(EXIT_FAILURE);
             }
