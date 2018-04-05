@@ -5,7 +5,7 @@
 #include <cstring>
 #include <iostream>
 
-#include "common/enums.h"
+#include "enums.h"
 
 using namespace std;
 
@@ -50,7 +50,7 @@ void creerPartie(int socket)
 
 	//verif message
         switch (id) {
-            case INIT_GAME:
+            case CREER_PARTIE:
                 tmp = msg.substr(nextCom, msg.find('|', nextCom) - nextCom);
                 break;
 
@@ -64,7 +64,7 @@ void creerPartie(int socket)
             boardSize = stoi(tmp);
         }
         catch (exception &e) {
-            if (send(socket, "1107||", sizeof("1107||"), 0) == -1){
+            if (send(socket, "003||", sizeof("003||"), 0) == -1){
                 perror("Envoie du message : ");
                 exit(EXIT_FAILURE);
             }
@@ -73,7 +73,7 @@ void creerPartie(int socket)
 
         if (boardSize < 5)
         {
-            if (send(socket, "1107||", sizeof("1107||"), 0) == -1){
+            if (send(socket, "003||", sizeof("003||"), 0) == -1){
                 perror("Envoie du message : ");
                 exit(EXIT_FAILURE);
             }
@@ -81,14 +81,14 @@ void creerPartie(int socket)
         }
         else if (boardSize > 30)
         {
-            if (send(socket, "1108||", sizeof("1108||"), 0) == -1){
+            if (send(socket, "004||", sizeof("004||"), 0) == -1){
                 perror("Envoie du message : ");
                 exit(EXIT_FAILURE);
             }
             continue;
         }
 
-	msg = INIT_SUCCESS + "||";
+	msg = SUCCES_CREE + "||";
 	
         if (send(socket, &msg, sizeof(&msg), 0) == -1){
             perror("Envoie du message : ");
@@ -184,7 +184,7 @@ void preparePlateau(int socket, BoardElements ** board)
             continue;
 
         switch (id) {
-            case INIT_GRID:
+            case CREER_PLATEAU:
                 tmp = msg.substr(nextCom, msg.find('|', nextCom) - nextCom);
                 break;
 
@@ -298,7 +298,7 @@ MsgTypes jouer(int socket, BoardElements ** adversaryBoard, int &x, int &y)
             continue;
 
         switch (id) {
-            case FIRE:
+            case ATTAQUER:
                 if (!getCible(msg, nextCom, x, y))
                 {
                     if (send(socket, "1506||", sizeof("1506||"), 0) == -1){
@@ -328,7 +328,7 @@ MsgTypes jouer(int socket, BoardElements ** adversaryBoard, int &x, int &y)
 
         if (adversaryBoard[x][y] == EMPTY)
         {
-            return MISS;
+            return M_MANQUE;
         }
         else
         {
@@ -338,16 +338,16 @@ MsgTypes jouer(int socket, BoardElements ** adversaryBoard, int &x, int &y)
             {
                 if (!verifPlateau(adversaryBoard))
                 {
-                    return WIN;
+                    return GAGNE;
                 }
                 else
                 {
-                    return SINK;
+                    return M_COULE;
                 }
             }
             else
             {
-                return HIT;
+                return M_TOUCHE;
             }
         }
     }
@@ -415,7 +415,7 @@ int main()
 	cout<<"SERVER>> Le client 1 c'est connecté"<<endl;
     }
 
-    if (send(p1_fd, "1050||", sizeof("1050||"), 0) == -1){
+    if (send(p1_fd, "000||", sizeof("000||"), 0) == -1){
         perror("Envoie du message : ");
         exit(EXIT_FAILURE);
     }
@@ -439,7 +439,7 @@ int main()
     //region Init Game & Board
     init_game.join();
 
-    string buf = JOIN_SUCCESS + "|" + to_string(boardSize) + "||";
+    string buf = PARTIE_REJOINTE + "|" + to_string(boardSize) + "||";
 
     if (send(p1_fd, &buf, sizeof(&buf), 0) == -1){
         perror("Envoie du message : ");
@@ -513,14 +513,14 @@ int main()
             case HIT:
                 break;
 
-            case MISS:
+            case M_MANQUE:
                 isFirstPlayerTurn = !isFirstPlayerTurn;
                 break;
 
-            case SINK:
+            case M_COULE:
                 break;
 
-            case WIN:
+            case GAGNE:
                 gameRunning = false;
                 break;
 
@@ -559,12 +559,12 @@ int main()
     int winner = (isFirstPlayerTurn) ? p1_fd : p2_fd;
     int looser = (isFirstPlayerTurn) ? p2_fd : p1_fd;
 
-    msg = WIN + "|" + to_string(x + 65) + to_string(y + 1) + "||";
+    msg = GAGNE + "|" + to_string(x + 65) + to_string(y + 1) + "||";
     if (send(winner, &msg, sizeof(&msg), 0) == -1) {
         perror("Envoie du message : ");
         exit(EXIT_FAILURE);
     }
-    msg = LOOSE + "|" + to_string(x + 65) + to_string(y + 1) + "||";
+    msg = PERDU + "|" + to_string(x + 65) + to_string(y + 1) + "||";
     if (send(looser, &msg, sizeof(&msg), 0) == -1) {
         perror("Envoie du message : ");
         exit(EXIT_FAILURE);
