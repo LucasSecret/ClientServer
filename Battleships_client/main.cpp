@@ -377,9 +377,9 @@ bool jouer(int socket, StatutCase **plateau, StatutCase **plateauAdverse, bool p
                 playing = true;
                 continue;
 
-            case TOUCHE:
-            case COULE:
-            case MANQUE:
+            case M_TOUCHE:
+            case M_COULE:
+            case M_MANQUE:
                 metAJourBateau(static_cast<MsgTypes>(codeRetour), plateauActuel, message, nextDelimiter);
                 afficher(plateau, plateauAdverse);
                 continue;
@@ -415,17 +415,17 @@ void metAJourBateau(MsgTypes type, StatutCase ** board, const std::string &messa
 
     switch (type)
     {
-        case TOUCHE:
+        case M_TOUCHE:
             cout << "Touché !" << endl;
             board[x][y] = TOUCHE;
             return;
 
-        case MANQUE:
+        case M_MANQUE:
             cout << "Manqué !" << endl;
             board[x][y] = MANQUE;
             return;
 
-        case COULE:
+        case M_COULE:
             cout << "Coulé !" << endl;
             couleBateau(x, y, board);
             return;
